@@ -1,6 +1,7 @@
 package pipelines
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"sync/atomic"
@@ -81,8 +82,8 @@ func (p *TextGenerationPipeline) Forward(batch *pipelineBackends.PipelineBatch) 
 	return nil
 }
 
-func (p *TextGenerationPipeline) Postprocess(batch *pipelineBackends.PipelineBatch) error {
-	return nil
+func (p *TextGenerationPipeline) Postprocess(batch *pipelineBackends.PipelineBatch) (*Chat, error) {
+	return nil, nil
 }
 
 func (p *TextGenerationPipeline) Validate() error {
@@ -93,6 +94,23 @@ func (p *TextGenerationPipeline) Run(inputs []string) (pipelineBackends.Pipeline
 	return nil, nil
 }
 
-func (p *TextGenerationPipeline) RunPipeline(inputs []string) ([]string, error) {
-	return []string{}, nil
+func (p *TextGenerationPipeline) RunPipeline(inputs []string) (*Chat, error) {
+	var runErrors []error
+	batch := pipelineBackends.NewBatch()
+	defer func(*pipelineBackends.PipelineBatch) {
+		runErrors = append(runErrors, batch.Destroy())
+	}(batch)
+	runErrors = append(runErrors, p.Preprocess(batch, inputs))
+	if e := errors.Join(runErrors...); e != nil {
+		return nil, e
+	}
+
+	runErrors = append(runErrors, p.Forward(batch))
+	if e := errors.Join(runErrors...); e != nil {
+		return nil, e
+	}
+
+	result, postErr := p.Postprocess(batch)
+	runErrors = append(runErrors, postErr)
+	return result, errors.Join(runErrors...)
 }

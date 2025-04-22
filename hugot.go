@@ -16,6 +16,7 @@ type Session struct {
 	tokenClassificationPipelines    pipelineMap[*pipelines.TokenClassificationPipeline]
 	textClassificationPipelines     pipelineMap[*pipelines.TextClassificationPipeline]
 	zeroShotClassificationPipelines pipelineMap[*pipelines.ZeroShotClassificationPipeline]
+	textGenerationPipeline          pipelineMap[*pipelines.TextGenerationPipeline]
 	models                          map[string]*pipelineBackends.Model
 	options                         *options.Options
 	environmentDestroy              func() error
@@ -37,6 +38,7 @@ func newSession(runtime string, opts ...options.WithOption) (*Session, error) {
 		textClassificationPipelines:     map[string]*pipelines.TextClassificationPipeline{},
 		tokenClassificationPipelines:    map[string]*pipelines.TokenClassificationPipeline{},
 		zeroShotClassificationPipelines: map[string]*pipelines.ZeroShotClassificationPipeline{},
+		textGenerationPipeline:          map[string]*pipelines.TextGenerationPipeline{},
 		models:                          map[string]*pipelineBackends.Model{},
 		options:                         parsedOptions,
 		environmentDestroy: func() error {
@@ -80,6 +82,12 @@ type TokenClassificationConfig = pipelineBackends.PipelineConfig[*pipelines.Toke
 
 // TokenClassificationOption is an option for a token classification pipeline
 type TokenClassificationOption = pipelineBackends.PipelineOption[*pipelines.TokenClassificationPipeline]
+
+// TextGenerationConfig is the configuration for a text generation pipeline
+type TextGenerationConfig = pipelineBackends.PipelineConfig[*pipelines.TextGenerationPipeline]
+
+// TextGenerationOption is an option for a text generation pipeline.
+type TextGenerationOption = pipelineBackends.PipelineOption[*pipelines.TextGenerationPipeline]
 
 // NewPipeline can be used to create a new pipeline of type T. The initialised pipeline will be returned and it
 // will also be stored in the session object so that all created pipelines can be destroyed with session.Destroy()
@@ -126,6 +134,8 @@ func NewPipeline[T pipelineBackends.Pipeline](s *Session, pipelineConfig pipelin
 		s.featureExtractionPipelines[name] = any(pipeline).(*pipelines.FeatureExtractionPipeline)
 	case *pipelines.ZeroShotClassificationPipeline:
 		s.zeroShotClassificationPipelines[name] = any(pipeline).(*pipelines.ZeroShotClassificationPipeline)
+	case *pipelines.TextGenerationPipeline:
+		s.textGenerationPipeline[name] = any(pipeline).(*pipelines.TextGenerationPipeline)
 	default:
 		return pipeline, fmt.Errorf("not implemented")
 	}
@@ -169,6 +179,14 @@ func InitializePipeline[T pipelineBackends.Pipeline](p T, pipelineConfig pipelin
 		}
 		pipeline = any(pipelineInitialised).(T)
 		name = config.Name
+	case *pipelines.TextGenerationPipeline:
+		config := any(pipelineConfig).(pipelineBackends.PipelineConfig[*pipelines.TextGenerationPipeline])
+		pipelineInitialised, err := pipelines.NewTextGenerationPipeline(config, options, model)
+		if err != nil {
+			return pipeline, name, err
+		}
+		pipeline = any(pipelineInitialised).(T)
+		name = config.Name
 	default:
 		return pipeline, name, fmt.Errorf("not implemented")
 	}
@@ -201,6 +219,12 @@ func GetPipeline[T pipelineBackends.Pipeline](s *Session, name string) (T, error
 		return any(p).(T), nil
 	case *pipelines.ZeroShotClassificationPipeline:
 		p, ok := s.zeroShotClassificationPipelines[name]
+		if !ok {
+			return pipeline, &pipelineNotFoundError{pipelineName: name}
+		}
+		return any(p).(T), nil
+	case *pipelines.TextGenerationPipeline:
+		p, ok := s.textGenerationPipeline[name]
 		if !ok {
 			return pipeline, &pipelineNotFoundError{pipelineName: name}
 		}

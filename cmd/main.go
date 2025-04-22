@@ -202,6 +202,14 @@ var runCommand = &cli.Command{
 			}
 			pipe, err = hugot.NewPipeline(session, config)
 			setupErrs = append(setupErrs, err)
+		case "textGeneration":
+			config := hugot.TextGenerationConfig{
+				ModelPath:    modelPath,
+				OnnxFilename: onnxFilename,
+				Name:         "cliPipeline",
+			}
+			pipe, err = hugot.NewPipeline(session, config)
+			setupErrs = append(setupErrs, err)
 		default:
 			setupErrs = append(setupErrs, fmt.Errorf("pipeline type %s not implemented for the cli", pipelineType))
 		}
